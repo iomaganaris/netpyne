@@ -58,6 +58,34 @@ INITIAL {
   factor2 = 1/factor2  
 }
 
+:INCLUDE "ghk.inc"
+
+FUNCTION ghkg(v(mV), ci(mM), co(mM), z) (mV) {
+    LOCAL xi, f, exi, fxi
+    f = R*(celsius+273.15)/(z*(1e-3)*FARADAY)
+    xi = v/f
+    exi = exp(xi)
+    if (fabs(xi) < 1e-4) {
+        fxi = 1 - xi/2
+    }else{
+        fxi = xi/(exi - 1)
+    }
+    ghkg = f*((ci/co)*exi - 1)*fxi
+}
+
+FUNCTION ghk(v(mV), ci(mM), co(mM), z) (.001 coul/cm3) {
+    LOCAL xi, f, exi, fxi
+    f = R*(celsius+273.15)/(z*(1e-3)*FARADAY)
+    xi = v/f
+    exi = exp(xi)
+    if (fabs(xi) < 1e-4) {
+        fxi = 1 - xi/2
+    }else{
+        fxi = xi/(exi - 1)
+    }
+    ghk = (.001)*z*FARADAY*(ci*exi - co)*fxi
+}
+
 BREAKPOINT {
   LOCAL iTOT
   SOLVE state METHOD cnexp
@@ -75,7 +103,7 @@ BREAKPOINT {
   g = sNMDA * mgblock
 }
 
-INCLUDE "ghk.inc"
+:INCLUDE "ghk.inc"
 
 DERIVATIVE state {
   A2' = -A2/tau1NMDA

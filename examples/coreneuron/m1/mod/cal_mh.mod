@@ -14,7 +14,7 @@ Author: Zach Mainen, Salk Institute, 1994, zach@salk.edu
 
 ENDCOMMENT
 
-INDEPENDENT {t FROM 0 TO 1 WITH 1 (ms)}
+:INDEPENDENT {t FROM 0 TO 1 WITH 1 (ms)}
 
 NEURON {
 	SUFFIX ca

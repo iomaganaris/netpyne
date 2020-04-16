@@ -2,7 +2,7 @@
 
 NEURON {
         SUFFIX cadyn
-        USEION ca READ cai,ica WRITE cai 
+        USEION ca READ ica WRITE cai 
         RANGE ca 
 	GLOBAL depth,cainf,taur 
      

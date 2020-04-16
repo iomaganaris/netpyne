@@ -7,6 +7,7 @@ NEURON {
 	SUFFIX kapcb
 	USEION k READ ko, ki WRITE ik		:Changed from READ ek, 23/04/2010,Nassi
         RANGE gkabar, ik
+        RANGE qt_
         :GLOBAL ninf,linf,taul,taun,lmin
 }
 
@@ -47,16 +48,17 @@ ASSIGNED {       :parameters needed to solve DE
         taun            (ms)
 	ko		(mM)
 	ki		(mM)
+        qt_
 }
 
 STATE {          :the unknown parameters to be solved in the DEs 
 	n l
 }
 
-LOCAL qt
+:LOCAL qt
 
 INITIAL {		:initialize the following parameter using rates()
-        qt = q10^((celsius-24)/10(degC))         : temprature adjustment factor
+        qt_ = q10^((celsius-24)/10(degC))         : temprature adjustment factor
 	rates(v)
 	n = ninf
 	l = linf
@@ -81,7 +83,7 @@ PROCEDURE rates(v (mV)) {                  :callable from hoc
 	
         a = alpn(v)
         ninf = 1/(1 + a)                   : activation variable steady state value
-        taun = betn(v)/(qt*a0n*(1+a))      : activation variable time constant
+        taun = betn(v)/(qt_*a0n*(1+a))      : activation variable time constant
 	if (taun<nmin) {taun=nmin}         : time constant not allowed to be less than nmin
         
 	a = alpl(v)

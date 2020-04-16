@@ -64,14 +64,14 @@ NET_RECEIVE (w) {
 	}
 }
 
-DESTRUCTOR {
-VERBATIM
-	void* vv = (void*)(_p_ptr);  
-        if (vv) {
-		hoc_obj_unref(*vector_pobj(vv));
-	}
-ENDVERBATIM
-}
+:DESTRUCTOR {
+:VERBATIM
+:	void* vv = (void*)(_p_ptr);  
+:        if (vv) {
+:		hoc_obj_unref(*vector_pobj(vv));
+:	}
+:ENDVERBATIM
+:}
 
 PROCEDURE element() {
 VERBATIM	

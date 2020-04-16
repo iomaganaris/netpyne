@@ -20,11 +20,11 @@ TITLE Fast mechanism for submembranal Ca++ concentration (cai)
 : Written by Alain Destexhe, Salk Institute, 1995
 :
 
-INDEPENDENT {t FROM 0 TO 1 WITH 1 (ms)}
+:INDEPENDENT {t FROM 0 TO 1 WITH 1 (ms)}
 
 NEURON {
   SUFFIX cadad
-  USEION ca READ ica, cai WRITE cai
+  USEION ca READ ica WRITE cai
   RANGE depth,kt,kd,cainf,taur
 }
 
@@ -34,12 +34,13 @@ UNITS {
   (um)	= (micron)
   (mA)	= (milliamp)
   (msM)	= (ms mM)
+  FARADAY = 96489 (coul)
 }
 
-CONSTANT {
-  FARADAY = 96489		(coul)		: moles do not appear in units
+:CONSTANT {
+:  FARADAY = 96489		(coul)		: moles do not appear in units
   :	FARADAY = 96.489	(k-coul)	: moles do not appear in units
-}
+:}
 
 PARAMETER {
   depth	= 1	(um)		: depth of shell

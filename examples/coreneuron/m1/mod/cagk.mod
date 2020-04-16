@@ -47,6 +47,10 @@ ASSIGNED {
 	oinf
 	tau		(ms)
         gkca          (mho/cm2)
+        :d1 :commented out for nrnivmodl
+        :d2 :commented out for nrnivmodl
+        :k1 :commented out for nrnivmodl
+        :k2 :commented out for nrnivmodl
 }
 
 INITIAL {

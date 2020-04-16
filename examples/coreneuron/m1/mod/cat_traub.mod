@@ -6,7 +6,7 @@ COMMENT
 
 ENDCOMMENT
 
-INDEPENDENT { t FROM 0 TO 1 WITH 1 (ms) }
+:INDEPENDENT { t FROM 0 TO 1 WITH 1 (ms) }
 
 UNITS { 
 	(mV) = (millivolt) 

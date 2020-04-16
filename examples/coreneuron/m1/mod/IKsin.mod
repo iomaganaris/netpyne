@@ -13,7 +13,7 @@ UNITS {
         (mM) = (milli/liter)
 	
 }
-INDEPENDENT {t FROM 0 TO 1 WITH 1 (ms)}
+:INDEPENDENT {t FROM 0 TO 1 WITH 1 (ms)}
 PARAMETER {
 	v (mV)
 	dt (ms)
