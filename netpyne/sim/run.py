@@ -124,12 +124,12 @@ def runSim (skipPreRun=False):
         if sim.rank == 0: print('\nRunning simulation using CoreNEURON for %s ms...' % sim.cfg.duration)
         sim.cfg.cache_efficient = True
         sim.cvode.cache_efficient(1)
-        h.finitialize(float(sim.cfg.hParams['v_init']))
-        sim.pc.nrncore_run("-e %g"%sim.cfg.duration, 0)
+        from neuron import coreneuron
+        coreneuron.enable = True
     else:
         if sim.rank == 0: print('\nRunning simulation for %s ms...' % sim.cfg.duration)
-        h.finitialize(float(sim.cfg.hParams['v_init']))
-        sim.pc.psolve(sim.cfg.duration)
+    h.finitialize(float(sim.cfg.hParams['v_init']))
+    sim.pc.psolve(sim.cfg.duration)
 
     sim.pc.barrier() # Wait for all hosts to get to this point
     sim.timing('stop', 'runTime')
