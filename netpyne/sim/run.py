@@ -55,8 +55,8 @@ def preRun ():
     # handler for printing out time during simulation run
     if sim.rank == 0 and sim.cfg.printRunTime:
         def printRunTime():
-            for i in range(int(sim.cfg.printRunTime*1000.0), int(sim.cfg.duration), int(sim.cfg.printRunTime*1000.0)):
-                sim.cvode.event(i, 'print ' + str(i/1000.0) + ',"s"')
+            print('%.1fs' % (h.t/1000.0))   
+            sim.cvode.event(h.t + int(sim.cfg.printRunTime*1000.0), sim.printRunTime)
 
         sim.printRunTime = printRunTime
         sim.fih.append(h.FInitializeHandler(1, sim.printRunTime))
@@ -92,16 +92,17 @@ def preRun ():
     # handler for recording LFP
     if sim.cfg.recordLFP:
         def recordLFPHandler():
-            for i in np.arange(sim.cfg.recordStep, sim.cfg.duration+sim.cfg.recordStep, sim.cfg.recordStep):
-                sim.cvode.event(i, sim.calculateLFP)
+            sim.cvode.event(h.t + int(sim.cfg.recordStep), sim.calculateLFP)
+            sim.cvode.event(h.t + int(sim.cfg.recordStep), recordLFPHandler)
 
         sim.recordLFPHandler = recordLFPHandler
         sim.fih.append(h.FInitializeHandler(0, sim.recordLFPHandler))  # initialize imemb
 
+
 #------------------------------------------------------------------------------
 # Run Simulation
 #------------------------------------------------------------------------------
-def runSim ():
+def runSim (skipPreRun=False):
     from .. import sim
 
     sim.pc.barrier()
@@ -113,7 +114,11 @@ def runSim ():
             if sim.cfg.verbose: 'Error Failed to use local dt.'
     sim.pc.barrier()
     sim.timing('start', 'runTime')
-    preRun()
+
+    if not skipPreRun:
+        preRun()
+    
+    h.finitialize(float(sim.cfg.hParams['v_init']))
 
     if sim.cfg.coreneuron == True:
         if sim.rank == 0: print('\nRunning simulation using CoreNEURON for %s ms...' % sim.cfg.duration)
@@ -183,7 +188,7 @@ def calculateLFP():
 #------------------------------------------------------------------------------
 # Calculate and print load balance
 #------------------------------------------------------------------------------
-def loadBalance ():
+def loadBalance (printNodeTimes = False):
     from .. import sim
 
     computation_time = sim.pc.step_time()
@@ -192,7 +197,9 @@ def loadBalance ():
     avg_comp_time = sim.pc.allreduce(computation_time, 1)/sim.nhosts
     load_balance = avg_comp_time/max_comp_time
 
-    print('node:',sim.rank,' comp_time:',computation_time)
+    if printNodeTimes:
+        print('node:',sim.rank,' comp_time:',computation_time)
+    
     if sim.rank==0:
         print('max_comp_time:', max_comp_time)
         print('min_comp_time:', min_comp_time)

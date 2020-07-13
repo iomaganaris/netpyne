@@ -1,3 +1,71 @@
+# Version 0.9.6
+
+- Added useful hover information to iplots
+
+- Improvements to iplotTraces
+
+- Added interactive plot for connectivity (iplotConn)
+
+- Added 'dynamicRates' option for NetStim populations
+
+- Added option to have a uniform distribution of rates for Vecstim pulses
+
+- Added function for distributed saving at intervals
+
+- Added issue templates for GitHub
+
+- Overhaul of contribution guide (CONTRIBUTING.md)
+
+- Improved documentation
+
+- Fixed bugs and improved exception handling in plotConn 
+
+- Fixed loadSave V1 example model
+
+- Fixed bug calculating popRates when no spikes
+
+- Fixed bug in _distributeSynsUniformly()
+
+- Fixed bug in saveCellParamsRule()
+
+- Fixed bug in batch.py: initCfg params were not being updated for evol optim
+
+- Fixed bug in subconn.py: missing initialization of newWeightNorm 
+
+- Fixed bug in run.py: print run time with 2 significant figures
+
+- Fixed output stat filenames of evolutionary optim: .cvs to .csv 
+
+- Fixed bug in interval saving
+
+- Fixed bug in spikes.py in plotSpikeStats
+
+
+# Version 0.9.5
+
+- Print start and end date/time
+
+- Avoid removing batch folder so can rerun and complete batch simulations
+
+- Added loadBalance option to print individual node computer times
+
+- Initialize hoc events recursivley to reduce event queue overhead
+
+- Added plotRateSpectrogram analysis function 
+
+- Added option to save at intervals 
+
+- Fixed bug: wrong indentation for initializing fixedInterval in batch.py
+
+- Fixed bug in _distributeSynsUniformly function
+
+- Fixed bug in subConnParams grouped synapses
+
+- Fixed bug in analysis.granger figure save name
+
+- Fixed bug in printRunTime function
+
+
 # Version 0.9.4
 
 - Added option to avoid creating connections with weight=0
@@ -7,6 +75,10 @@
 - Rotated conn matrix x-axis labels so can fit large matrices 
 
 - Added 'removeWeightNorm' argument to plotConn() function
+
+- Added cfg option 'oneSynPerNetcon' to conn rules to create one synapse object per Netcon
+
+- Added first version of Contributors Guide
 
 - Fixed file write permissions for evol optim batches
 
@@ -20,6 +92,9 @@
 
 - Fixed bug in grid lines of plotConn
 
+- Fixed bug in subConnParams by sorting conns to ensure reproducibility on different number of cores
+
+- Fixed bug so uses 'Agg' backend if no display env variable e.g. in clusters
 
 
 # Version 0.9.3.1

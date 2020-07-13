@@ -21,6 +21,10 @@ from neuron import h # Import NEURON
 from .. import specs
 from ..specs import Dict, ODict
 from . import utils
+try:
+    from datetime import datetime
+except:
+    pass
 
 #------------------------------------------------------------------------------
 # initialize variables and MPI
@@ -49,7 +53,11 @@ def initialize (netParams = None, simConfig = None, net = None):
 
     sim.setSimCfg(simConfig)  # set simulation configuration
 
-    if sim.rank==0:
+    if sim.rank == 0:
+        try:
+            print('\nStart time: ', datetime.now())
+        except:
+            pass
         sim.timing('start', 'initialTime')
         sim.timing('start', 'totalTime')
 
@@ -317,12 +325,10 @@ def setupRecording ():
         setupRecordLFP()
 
     # try to record dipoles
-    
     if sim.cfg.recordDipoles:
-        dp_rec_L2 = h.Vector()
-        dp_rec_L5 = h.Vector()
-        dp_rec_L2.record(h._ref_dp_total_L2) # L2 dipole recording
-        dp_rec_L5.record(h._ref_dp_total_L5)  # L5 dipole recording
+        recordStep = 0.1 if sim.cfg.recordStep == 'adaptive' else sim.cfg.recordStep
+        dp_rec_L2 = h.Vector(sim.cfg.duration/recordStep+1)
+        dp_rec_L5 = h.Vector(sim.cfg.duration/recordStep+1)
         sim.simData['dipole'] = {'L2': dp_rec_L2, 'L5': dp_rec_L5}  
     
     sim.timing('stop', 'setrecordTime')

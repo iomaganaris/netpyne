@@ -39,8 +39,7 @@ from ..specs import Dict
 #
 ###############################################################################
 
-# --- Temporarily copied from HNN code; improve so doesn't use h globals ---  
-# global variables for dipole calculation, should be node-independent 
+# --- Temporarily copied from HNN code ---
 
 class CompartCell (Cell):
     ''' Class for section-based neuron models '''
@@ -65,9 +64,6 @@ class CompartCell (Cell):
     def create (self):
         from .. import sim
                 
-        if sim.cfg.recordDipoles:
-            h("dp_total_L2 = 0."); h("dp_total_L5 = 0.") # put here since these variables used in cells
-
         # generate random rotation angle for each cell
         if sim.net.params.rotateCellsRandomly:
             if isinstance(sim.net.params.rotateCellsRandomly, list):
@@ -258,7 +254,7 @@ class CompartCell (Cell):
         return L
 
     # insert dipole in section
-    def __dipoleInsert(self, secName, sec):
+    def __dipoleInsert(self, secName, sec, cell_dpl_ref):
 
         # insert dipole mech (dipole.mod)
         try:
@@ -278,10 +274,7 @@ class CompartCell (Cell):
         dpp.ri = h.ri(1, sec=sec['hObj'])
         # sets pointers in dipole mod file to the correct locations -- h.setpointer(ref, ptr, obj)
         h.setpointer(sec['hObj'](0.99)._ref_v, 'pv', dpp)
-        if self.tags['cellType'].startswith('L2'):
-            h.setpointer(h._ref_dp_total_L2, 'Qtotal', dpp)
-        elif self.tags['cellType'].startswith('L5'):
-            h.setpointer(h._ref_dp_total_L5, 'Qtotal', dpp)
+        h.setpointer(cell_dpl_ref, 'Qtotal', dpp)
 
         # gives INTERNAL segments of the section, non-endpoints
         # creating this because need multiple values simultaneously
@@ -303,11 +296,7 @@ class CompartCell (Cell):
             else:
                 h.setpointer(sec['hObj'](0)._ref_v, 'pv', sec['hObj'](loc[i]).dipole)
             # set aggregate pointers
-            h.setpointer(dpp._ref_Qsum, 'Qsum', sec['hObj'](loc[i]).dipole)
-            if self.tags['cellType'].startswith('L2'):
-                h.setpointer(h._ref_dp_total_L2, 'Qtotal', sec['hObj'](loc[i]).dipole)
-            elif self.tags['cellType'].startswith('L5'):
-                h.setpointer(h._ref_dp_total_L5, 'Qtotal', sec['hObj'](loc[i]).dipole)
+            h.setpointer(cell_dpl_ref, 'Qtotal', sec['hObj'](loc[i]).dipole)
             # add ztan values
             sec['hObj'](loc[i]).dipole.ztan = y_diff[i]
         # set the pp dipole's ztan value to the last value from y_diff
@@ -433,10 +422,15 @@ class CompartCell (Cell):
 
         # add dipoles
         if sim.cfg.recordDipoles:
+            #  Vectors can't be stored in Cell class because it gets pickled
+            sim.net.cells_dpl[self.gid] = h.Vector(1)  # create a simple hoc object to store the dipole value for this cell
+            cells_dpl_ref = sim.net.cells_dpl[self.gid]._ref_x[0]
+            sim.net.cells_dpls[self.gid] = h.Vector().record(cells_dpl_ref)  # set up recording of current value
+
             for sectName,sectParams in prop['secs'].items():
                 sec = self.secs[sectName]
                 if 'mechs' in sectParams and 'dipole' in sectParams['mechs']:
-                    self.__dipoleInsert(sectName, sec)  # add dipole mechanisms to each section
+                    self.__dipoleInsert(sectName, sec, cells_dpl_ref)  # add dipole mechanisms to each section
 
         # Print message about error inserting mechanisms
         if mechInsertError:
@@ -486,9 +480,12 @@ class CompartCell (Cell):
         # assumes python structure exists
         for conn in self.conns:
             # set postsyn target
-            synMech = next((synMech for synMech in self.secs[conn['sec']]['synMechs'] if synMech['label']==conn['synMech'] and synMech['loc']==conn['loc']), None)
-
-            if not synMech: 
+            if sim.cfg.oneSynPerNetcon:
+                synMech = None
+            else: 
+                synMech = next((synMech for synMech in self.secs[conn['sec']]['synMechs'] if synMech['label'] == conn['synMech'] and synMech['loc'] == conn['loc']), None)
+            
+            if not synMech:
                 synMech = self.addSynMech(conn['synMech'], conn['sec'], conn['loc'])
                 #continue  # go to next conn
 
@@ -560,8 +557,11 @@ class CompartCell (Cell):
 
         if synMechParams and sec:  # if both the synMech and the section exist
             if sim.cfg.createPyStruct and sim.cfg.addSynMechs:
-                synMech = next((synMech for synMech in sec['synMechs'] if synMech['label']==synLabel and synMech['loc']==loc), None)
-                if not synMech:  # if synMech not in section, then create
+                if sim.cfg.oneSynPerNetcon:
+                    synMech = None
+                else:
+                    synMech = next((synMech for synMech in sec['synMechs'] if synMech['label']==synLabel and synMech['loc']==loc), None)
+                if not synMech:  # if synMech not in section, or need multiple synMech per section, then create
                     synMech = Dict({'label': synLabel, 'loc': loc})
                     for paramName, paramValue in synMechParams.items():
                         synMech[paramName] = paramValue
@@ -657,7 +657,7 @@ class CompartCell (Cell):
         if params.get('weight') is None: params['weight'] = sim.net.params.defaultWeight # if no weight, set default
         if params.get('delay') is None: params['delay'] = sim.net.params.defaultDelay # if no delay, set default
         if params.get('loc') is None: params['loc'] = 0.5 # if no loc, set default
-        if params.get('synsPerConn') is None: params['synsPerConn'] = 1 # if no synsPerConn, set default
+        if params.get('synsPerConn') is None: params['synsPerConn'] = 1  # if no synsPerConn, set default
 
         # Get list of section labels
         secLabels = self._setConnSections(params)
@@ -692,11 +692,11 @@ class CompartCell (Cell):
             synMechs, synMechSecs, synMechLocs = self._setConnSynMechs(params, secLabels)
             if synMechs == -1: return
 
-            # Adapt weight based on section weightNorm (normalization based on section location)
-            for i,(sec,loc) in enumerate(zip(synMechSecs, synMechLocs)):
-                if 'weightNorm' in self.secs[sec] and isinstance(self.secs[sec]['weightNorm'], list): 
-                    nseg = self.secs[sec]['geom']['nseg']
-                    weights[i] = weights[i] * self.secs[sec]['weightNorm'][int(round(loc*nseg))-1] 
+        # Adapt weight based on section weightNorm (normalization based on section location)
+        for i,(sec,loc) in enumerate(zip(synMechSecs, synMechLocs)):
+            if 'weightNorm' in self.secs[sec] and isinstance(self.secs[sec]['weightNorm'], list): 
+                nseg = self.secs[sec]['geom']['nseg']
+                weights[i] = weights[i] * self.secs[sec]['weightNorm'][int(round(loc*nseg))-1]
 
         # Create connections
         for i in range(params['synsPerConn']):
@@ -1117,7 +1117,7 @@ class CompartCell (Cell):
                 if 'vref' in pointpParams:  # if includes vref param means doesn't use Section v or synaptic mechanisms
                     pointp = pointpName
                     if 'synList' in pointpParams:
-                        if params.get('synMech') in pointpParams['synList']: 
+                        if params.get('synMech') in pointpParams['synList']:
                             if isinstance(params.get('synMech'), list):
                                 weightIndex = [pointpParams['synList'].index(synMech) for synMech in params.get('synMech')]
                             else:
@@ -1188,9 +1188,8 @@ class CompartCell (Cell):
                 if len(synMechLocs)>1: 
                     synMechLocs[pos], synMechLocs[0] = synMechLocs[0], synMechLocs[pos]
 
-        # add synaptic mechanism to section based on synMechSecs and synMechLocs (if already exists won't be added)
+        # add synaptic mechanism to section based on synMechSecs and synMechLocs (if already exists won't be added unless nonLinear set to True)
         synMechs = [self.addSynMech(synLabel=params['synMech'], secLabel=synMechSecs[i], loc=synMechLocs[i]) for i in range(synsPerConn)] 
-
         return synMechs, synMechSecs, synMechLocs
 
 
@@ -1198,17 +1197,17 @@ class CompartCell (Cell):
         from .. import sim
 
         from numpy import cumsum
-
-        if 'L' in self.secs[secList[0]]['geom']:
-            secLengths = [self.secs[s]['geom']['L'] for s in secList]
-        elif getattr(self.secs[secList[0]]['hObj'], 'L', None):
-            secLengths = [self.secs[s]['hObj'].L for s in secList]
-        else:
-            secLengths = [1.0 for s in secList]
-            if sim.cfg.verbose: 
-                print(('  Section lengths not available to distribute synapses in cell %d'%self.gid))
-            
         try:
+            if 'L' in self.secs[secList[0]]['geom']:
+                secLengths = [self.secs[s]['geom']['L'] for s in secList]
+            elif getattr(self.secs[secList[0]]['hObj'], 'L', None):
+                secLengths = [self.secs[s]['hObj'].L for s in secList]
+            else:
+                secLengths = [1.0 for s in secList]
+                if sim.cfg.verbose: 
+                    print(('  Section lengths not available to distribute synapses in cell %d'%self.gid))
+
+            secLengths = [x for x in secLengths if isinstance(x, Number)]
             totLength = sum(secLengths)
             cumLengths = list(cumsum(secLengths))
             absLocs = [i*(totLength/numSyns)+totLength/numSyns/2 for i in range(numSyns)]
@@ -1286,7 +1285,10 @@ class CompartCell (Cell):
         for sec in list(self.secs.values()):
             hSec = sec['hObj']
             for iseg, seg in enumerate(hSec):
-                self.imembPtr.pset(jseg, seg._ref_i_membrane_)  # notice the underscore at the end (in nA)
+                try:
+                    self.imembPtr.pset(jseg, seg._ref_i_membrane_)  # notice the underscore at the end (in nA)
+                except:
+                    '  Error setting Vector to point to i_membrane_'
                 jseg += 1
                 
 

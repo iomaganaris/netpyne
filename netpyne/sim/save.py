@@ -33,10 +33,13 @@ from . import utils
 #------------------------------------------------------------------------------
 def saveJSON(fileName, data):
     import json, io
+    from .utils import NpSerializer
+
     with io.open(fileName, 'w', encoding='utf8') as fileObj:
         str_ = json.dumps(data,
                           indent=4, sort_keys=True,
-                          separators=(',', ': '), ensure_ascii=False)
+                          separators=(',', ': '), ensure_ascii=False,
+                          cls=NpSerializer)
         fileObj.write(to_unicode(str_))
 
 
@@ -247,9 +250,23 @@ def compactConnFormat():
 def intervalSave (t):
     from .. import sim
     from ..specs import Dict
-    import pickle
-    
+    import pickle, os
+    import numpy as np
+
     sim.pc.barrier()    
+
+    # create folder if missing
+    if sim.rank == 0:
+        if hasattr(sim.cfg, 'intervalFolder'):
+            targetFolder = sim.cfg.intervalFolder
+        else: 
+            targetFolder = os.path.dirname(sim.cfg.filename)
+        
+        if targetFolder and not os.path.exists(targetFolder):
+            try:
+                os.mkdir(targetFolder)
+            except OSError:
+                print(' Could not create target folder: %s' % (targetFolder))
     
     gatherLFP=True
     simDataVecs = ['spkt','spkid','stims']+list(sim.cfg.recordTraces.keys())
@@ -259,6 +276,10 @@ def intervalSave (t):
 
     # gather only sim data
     nodeData = {'simData': sim.simData}
+    if hasattr(sim.cfg, 'saveWeights'):
+        if sim.cfg.saveWeights:
+            nodeData['simData']['allWeights']= sim.allWeights
+            simDataVecs = simDataVecs + ['allWeights']
     data = [None]*sim.nhosts
     data[0] = {}
     for k,v in nodeData.items():
@@ -294,12 +315,11 @@ def intervalSave (t):
                 elif key not in singleNodeVecs:
                     sim.allSimData[key].update(val)           # update simData dicts which are not Vectors
         
-        
         if len(sim.allSimData['spkt']) > 0:
             sim.allSimData['spkt'], sim.allSimData['spkid'] = zip(*sorted(zip(sim.allSimData['spkt'], sim.allSimData['spkid']))) # sort spks
             sim.allSimData['spkt'], sim.allSimData['spkid'] = list(sim.allSimData['spkt']), list(sim.allSimData['spkid'])
 
-        name = 'temp/data_{:0.0f}.pkl'.format(t)
+        name = targetFolder + '/data_{:0.0f}.pkl'.format(t)
         with open(name, 'wb') as f:
             pickle.dump(dict(sim.allSimData), f, protocol=2)
 
@@ -317,6 +337,11 @@ def intervalSave (t):
     for k, v in sim.simData.items():
         if k in ['spkt', 'spkid', 'stims']:
             v.resize(0)
+    
+    if hasattr(sim.cfg, 'saveWeights'):
+        if sim.cfg.saveWeights:
+            sim.allWeights = []
+    
     
 #------------------------------------------------------------------------------
 # Save data in each node
@@ -532,3 +557,90 @@ def saveInNode(gatherLFP=True, include=None, filename=None):
         # return full path
         import os
         return os.getcwd() + '/' + filePath
+
+#------------------------------------------------------------------------------
+# Save data in each node
+#------------------------------------------------------------------------------
+def saveSimDataInNode(filename=None):
+    from .. import sim
+    from ..specs import Dict, ODict    
+
+    #This first part should be split to a separate function in gather.py
+    
+    sim.timing('start', 'saveInNodeTime')
+    import os
+
+    # create folder if missing
+    targetFolder = os.path.dirname(sim.cfg.filename)
+    if targetFolder and not os.path.exists(targetFolder):
+        try:
+            os.mkdir(targetFolder)
+        except OSError:
+            print(' Could not create target folder: %s' % (targetFolder))
+
+    # saving data
+    dataSave = {}
+
+    dataSave['netpyne_version'] = sim.version(show=False)
+    dataSave['netpyne_changeset'] = sim.gitChangeset(show=False)
+
+    simDataVecs = ['spkt','spkid','stims']+list(sim.cfg.recordTraces.keys())
+    singleNodeVecs = ['t']
+
+    saveSimData =  {}
+    for k in list(sim.simData.keys()):  # initialize all keys of allSimData dict
+        saveSimData[k] =  {}
+    for key,val in sim.simData.items():  # update simData dics of dics of h.Vector
+            if key in simDataVecs+singleNodeVecs:          # simData dicts that contain Vectors
+                if isinstance(val,dict):
+                    for cell,val2 in val.items():
+                        if isinstance(val2,dict):
+                            saveSimData[key].update({cell: {}})
+                            for stim,val3 in val2.items():
+                                saveSimData[key][cell].update({stim:list(val3)}) # udpate simData dicts which are dicts of dicts of Vectors (eg. ['stim']['cell_1']['backgrounsd']=h.Vector)
+                        else:
+                            saveSimData[key].update({cell:list(val2)})  # udpate simData dicts which are dicts of Vectors (eg. ['v']['cell_1']=h.Vector)
+                else:
+                    saveSimData[key] = list(saveSimData[key])+list(val) # udpate simData dicts which are Vectors
+            else:
+                saveSimData[key] = val           # update simData dicts which are not Vectors
+
+    dataSave['simData'] = saveSimData
+
+    if getattr(sim.net.params, 'version', None): dataSave['netParams_version'] = sim.net.params.version
+
+    if dataSave:
+        if sim.cfg.timestampFilename:
+            timestamp = time()
+            timestampStr = '-' + datetime.fromtimestamp(timestamp).strftime('%Y%m%d_%H%M%S')
+        else:
+            timestampStr = ''
+        
+        filePath = sim.cfg.filename + timestampStr
+        # Save to pickle file
+        if sim.cfg.savePickle:
+            import pickle
+            dataSave = utils.replaceDictODict(dataSave)
+            print(('Saving output as %s ... ' % (filePath+str(sim.rank)+'.pkl')))
+            with open(filePath+str(sim.rank)+'.pkl', 'wb') as fileObj:
+                pickle.dump(dataSave, fileObj)
+            print('Finished saving!')
+
+        # Save to json file
+        if sim.cfg.saveJson:
+            # Make it work for Python 2+3 and with Unicode
+            print(('Saving output as %s ... ' % (filePath+str(sim.rank)+'.json ')))
+            #dataSave = utils.replaceDictODict(dataSave)  # not required since json saves as dict
+            sim.saveJSON(filePath+ str(sim.rank) + '.json', dataSave)
+            print('Finished saving!')
+            print('Finished saving!')
+
+        # Save timing
+        if sim.rank == 0:
+            if sim.cfg.timing:
+                sim.timing('stop', 'saveInNodeTime')
+                print(('  Done; saving time = %0.2f s.' % sim.timingData['saveInNodeTime']))
+            if sim.cfg.timing and sim.cfg.saveTiming:
+                import pickle
+                with open('timing.pkl', 'wb') as file: pickle.dump(sim.timing, file)
+
