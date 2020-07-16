@@ -126,16 +126,20 @@ def runSim (skipPreRun=False):
         sim.cvode.cache_efficient(1)
         from neuron import coreneuron
         coreneuron.enable = True
+        sim.pc.nrnbbcore_write('coredat%d' % sim.nhosts)
     else:
         if sim.rank == 0: print('\nRunning simulation for %s ms...' % sim.cfg.duration)
     h.finitialize(float(sim.cfg.hParams['v_init']))
+    sim.timing('start', 'psolveTime')
     sim.pc.psolve(sim.cfg.duration)
 
     sim.pc.barrier() # Wait for all hosts to get to this point
+    sim.timing('stop', 'psolveTime')
     sim.timing('stop', 'runTime')
     if sim.rank==0:
         print('  Done; run time = %0.2f s; real-time ratio: %0.2f.' %
             (sim.timingData['runTime'], sim.cfg.duration/1000/sim.timingData['runTime']))
+        print('  psolve time = %0.2f s' % sim.timingData['psolveTime'])
 
 
 #------------------------------------------------------------------------------
