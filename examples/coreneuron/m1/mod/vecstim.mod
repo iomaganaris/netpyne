@@ -143,14 +143,17 @@ static void bbcore_write(double* xarray, int* iarray, int* xoffset, int* ioffset
 static void bbcore_read(double* xarray, int* iarray, int* xoffset, int* ioffset, _threadargsproto_) {
   int dsize, i, *ia;
   double *xa, *dv;
-  assert(!_p_ptr);
-  xa = xarray + *xoffset;
-  ia = iarray + *ioffset;
-  dsize = ia[0];
-  _p_ptr = vector_new1(dsize);
-  dv = vector_vec(_p_ptr);
-  for (i = 0; i < dsize; ++i) {
-    dv[i] = xa[i];
+  dsize = 0;
+  if (xarray) {
+      assert(!_p_ptr);
+      xa = xarray + *xoffset;
+      ia = iarray + *ioffset;
+      dsize = ia[0];
+      _p_ptr = vector_new1(dsize);
+      dv = vector_vec(_p_ptr);
+      for (i = 0; i < dsize; ++i) {
+          dv[i] = xa[i];
+      }
   }
   *xoffset += dsize;
   *ioffset += 1;
