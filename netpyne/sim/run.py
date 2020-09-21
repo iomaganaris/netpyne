@@ -126,6 +126,7 @@ def runSim (skipPreRun=False):
         sim.cvode.cache_efficient(1)
         from neuron import coreneuron
         coreneuron.enable = True
+        coreneuron.cell_permute = 0
         sim.pc.nrnbbcore_write('coredat%d' % sim.nhosts)
     else:
         if sim.rank == 0: print('\nRunning simulation for %s ms...' % sim.cfg.duration)
