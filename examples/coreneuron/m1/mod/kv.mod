@@ -53,7 +53,8 @@ NEURON {
 	RANGE n, gk, gbar
 	RANGE ninf, ntau
 	GLOBAL Ra, Rb
-	GLOBAL q10, temp, tadj, vmin, vmax
+	GLOBAL q10, temp, vmin, vmax
+	RANGE tadj
 }
 
 UNITS {
