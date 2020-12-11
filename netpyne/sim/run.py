@@ -126,13 +126,26 @@ def runSim (skipPreRun=False):
         sim.cvode.cache_efficient(1)
         from neuron import coreneuron
         coreneuron.enable = True
-        coreneuron.cell_permute = 0
+        if sim.cfg.gpu == True:
+            coreneuron.gpu = True
+            coreneuron.cell_permute = 2
+        else:
+            coreneuron.cell_permute = 0
         sim.pc.nrnbbcore_write('coredat%d' % sim.nhosts)
+        if sim.cfg.prcellstate != -1:
+            sim.pc.prcellstate(sim.cfg.prcellstate, 'corenrn_start')
     else:
         if sim.rank == 0: print('\nRunning simulation for %s ms...' % sim.cfg.duration)
+        if sim.cfg.prcellstate != -1:
+            sim.pc.prcellstate(sim.cfg.prcellstate, 'nrn_start')
     h.finitialize(float(sim.cfg.hParams['v_init']))
     sim.timing('start', 'psolveTime')
     sim.pc.psolve(sim.cfg.duration)
+    if sim.cfg.prcellstate != -1:
+        if sim.cfg.coreneuron == True:
+            sim.pc.prcellstate(sim.cfg.prcellstate, 'corenrn_end')
+        else:
+            sim.pc.prcellstate(sim.cfg.prcellstate, 'nrn_end')
 
     sim.pc.barrier() # Wait for all hosts to get to this point
     sim.timing('stop', 'psolveTime')
